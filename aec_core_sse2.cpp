@@ -159,7 +159,7 @@ static void FilterAdaptationSSE2(
     int x_fft_buf_block_pos,
     float x_fft_buf[2][kExtendedNumPartitions * PART_LEN1],
     float e_fft[2][PART_LEN1],
-    float h_fft_buf[2][kExtendedNumPartitions * PART_LEN1]) {
+    float h_fft_buf[2][kExtendedNumPartitions * PART_LEN1], float xPow[PART_LEN1]) {
   float fft[PART_LEN2];
   int i, j;
 

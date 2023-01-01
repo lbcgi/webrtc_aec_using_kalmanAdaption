@@ -361,7 +361,7 @@ static void FilterAdaptation(
     int x_fft_buf_block_pos,
     float x_fft_buf[2][kExtendedNumPartitions * PART_LEN1],
     float e_fft[2][PART_LEN1],
-    float h_fft_buf[2][kExtendedNumPartitions * PART_LEN1]) {
+    float h_fft_buf[2][kExtendedNumPartitions * PART_LEN1], float x_pow[PART_LEN1]) {
   int i, j;
   float fft[PART_LEN2];
   for (i = 0; i < num_partitions; i++) {
@@ -376,7 +376,7 @@ static void FilterAdaptation(
 
 	/*Preparations before compute mu & G*/
 #ifdef KALMAN_ADAPTION
-	memset(X2, 0, sizeof(X2));
+	//memset(X2, 0, sizeof(X2));
 	for (i = 0; i < num_partitions; i++) {
 		int xPos = (i + x_fft_buf_block_pos) * (PART_LEN1);
 		// Check for wrap
@@ -384,17 +384,17 @@ static void FilterAdaptation(
 			xPos -= num_partitions * PART_LEN1;
 		}
 		//Compute X2 Enegy
-		for (j = 0; j < PART_LEN; j += 4) {
+		for (j = 0; j < PART_LEN; j ++) {
 			//Load x_fft_buf
 			float re = x_fft_buf[0][xPos + j];
 			float im = x_fft_buf[1][xPos + j];
-			X2[j] = X2[j] + re * re + im * im;
+			X2[j] += re * re + im * im;
 		}
 
 	}
 
 	//Compute E2 Enegy
-	for (j = 0; j < PART_LEN; j += 4) {
+	for (j = 0; j < PART_LEN1; j++) {
 		//Load e_fft
 		float re = e_fft[0][j];
 		float im = e_fft[1][j];
@@ -420,18 +420,24 @@ static void FilterAdaptation(
 			e_fft[0][j], e_fft[1][j]);
 		fft[2 * j + 1] = MulIm(G[0][xPos + j], -G[1][xPos + j],
 			e_fft[0][j], e_fft[1][j]);
-#endif
+#else
       
 		fft[2 * j] = MulRe(x_fft_buf[0][xPos + j], -x_fft_buf[1][xPos + j],
 							e_fft[0][j], e_fft[1][j]);
 		fft[2 * j + 1] = MulIm(x_fft_buf[0][xPos + j], -x_fft_buf[1][xPos + j],
 								e_fft[0][j], e_fft[1][j]);
-
+#endif
 
     }
+#ifdef KALMAN_ADAPTION
+	fft[1] =
+		MulRe(G[0][xPos + PART_LEN], -G[1][xPos + PART_LEN],
+			e_fft[0][PART_LEN], e_fft[1][PART_LEN]);
+#else
     fft[1] =
         MulRe(x_fft_buf[0][xPos + PART_LEN], -x_fft_buf[1][xPos + PART_LEN],
               e_fft[0][PART_LEN], e_fft[1][PART_LEN]);
+#endif
 
     ooura_fft.InverseFft(fft);
     memset(fft + PART_LEN, 0, sizeof(float) * PART_LEN);
@@ -1104,9 +1110,9 @@ static void EchoSubtraction(const OouraFft& ooura_fft,
   Fft(ooura_fft, e_extended, e_fft);
 
   // Scale error signal inversely with far power.
-  WebRtcAec_ScaleErrorSignal(1, error_threshold, x_pow, e_fft);
+  //WebRtcAec_ScaleErrorSignal(filter_step_size, error_threshold, x_pow, e_fft);
   WebRtcAec_FilterAdaptation(ooura_fft, num_partitions, *x_fft_buf_block_pos,
-                             x_fft_buf, e_fft, h_fft_buf);
+                             x_fft_buf, e_fft, h_fft_buf, x_pow);
   memcpy(echo_subtractor_output, e, sizeof(float) * PART_LEN);
 }
 
@@ -1787,7 +1793,7 @@ int WebRtcAec_InitAec(AecCore* aec, int sampFreq) {
   //kalman
 #ifdef KALMAN_ADAPTION
   for (i = 0; i < kExtendedNumPartitions; ++i)
-	  P[i] = 100.0f;//³õÊ¼»¯Îó²î¾ØÕó
+	  P[i] = 1.0f;//³õÊ¼»¯Îó²î¾ØÕó
 #endif
   return 0;
 }
