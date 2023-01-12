@@ -73,9 +73,9 @@ float E2[PART_LEN1] = { 0 };
 float H2[kExtendedNumPartitions*PART_LEN1] = { 0 };
 float Pe[kExtendedNumPartitions*PART_LEN1] = { 0 };
 float mu[kExtendedNumPartitions*PART_LEN1] = { 0 };
-float P[kExtendedNumPartitions*PART_LEN1] = { 0 };
+float P[kExtendedNumPartitions*PART_LEN1];
 float G[2][kExtendedNumPartitions * PART_LEN1] = { 0 };
-float A = 0.999;
+float A = 0.995;
 #endif
 
 // Buffer size (samples)
@@ -361,64 +361,84 @@ static void FilterAdaptation(
     int x_fft_buf_block_pos,
     float x_fft_buf[2][kExtendedNumPartitions * PART_LEN1],
     float e_fft[2][PART_LEN1],
-    float h_fft_buf[2][kExtendedNumPartitions * PART_LEN1], float x_pow[PART_LEN1]) {
+    float h_fft_buf[2][kExtendedNumPartitions * PART_LEN1]) {
   int i, j;
+  int Pos;
+
   float fft[PART_LEN2];
+  float coefs_extended[PART_LEN2];
+
+
+  /*Preparations before compute mu & G*/
+#ifdef KALMAN_ADAPTION
+	memset(X2, 0, sizeof(X2));
+	for (j = 0; j < PART_LEN; j++) {
+		//Compute X2 Enegy
+		for (i = 0; i < num_partitions; i++) {
+			int xPos = (i + x_fft_buf_block_pos) * (PART_LEN1);
+			// Check for wrap
+			if (i + x_fft_buf_block_pos >= num_partitions) {
+				xPos -= num_partitions * PART_LEN1;
+			}
+			//Load x_fft_buf
+			float re = x_fft_buf[0][xPos + j];
+			float im = x_fft_buf[1][xPos + j];
+			X2[j] += (re * re + im * im)*num_partitions;
+			//printf("Pe:%f\n", Pe[xPos + 33]);
+
+		}
+		////Compute E2 Enegy
+		float re = e_fft[0][j];
+		float im = e_fft[1][j];
+		E2[j] = 0.99*E2[j] + 0.01*(re * re + im * im);
+
+
+	}
+ 
+#endif
+	//printf("X2:%f\n", X2[33]);
+	//printf("------------------------------------------\n");
+	//printf("E2:%f\n\n", E2[33]);
+
   for (i = 0; i < num_partitions; i++) {
     int xPos = (i + x_fft_buf_block_pos) * (PART_LEN1);
-    int pos;
     // Check for wrap
     if (i + x_fft_buf_block_pos >= num_partitions) {
       xPos -= num_partitions * PART_LEN1;
     }
-
-    pos = i * PART_LEN1;
-
-	/*Preparations before compute mu & G*/
-#ifdef KALMAN_ADAPTION
-	//memset(X2, 0, sizeof(X2));
-	for (i = 0; i < num_partitions; i++) {
-		int xPos = (i + x_fft_buf_block_pos) * (PART_LEN1);
-		// Check for wrap
-		if (i + x_fft_buf_block_pos >= num_partitions) {
-			xPos -= num_partitions * PART_LEN1;
-		}
-		//Compute X2 Enegy
-		for (j = 0; j < PART_LEN; j ++) {
-			//Load x_fft_buf
-			float re = x_fft_buf[0][xPos + j];
-			float im = x_fft_buf[1][xPos + j];
-			X2[j] += re * re + im * im;
-		}
-
-	}
-
-	//Compute E2 Enegy
-	for (j = 0; j < PART_LEN1; j++) {
-		//Load e_fft
-		float re = e_fft[0][j];
-		float im = e_fft[1][j];
-		E2[j] = re * re + im * im;
-	}
-#endif
-
-
+    Pos = i * PART_LEN1;
     for (j = 0; j < PART_LEN; j++) {
 
-#ifdef KALMAN_ADAPTION
-		float re = h_fft_buf[0][pos + j];
-		float im = h_fft_buf[1][pos + j];
-		H2[xPos + j] = re * re + im * im;
-		Pe[xPos + j] = P[xPos + j] * X2[j] + E2[j] / num_partitions;
-		mu[xPos + j] = P[xPos + j] / (Pe[xPos + j] + 0.0000001f);
-		P[xPos + j] = A * (1 - 0.5*mu[xPos + j] * X2[j])*P[xPos + j] + (1 - A)*H2[xPos + j];
-		//Compute G 
-		G[0][xPos + j] = mu[xPos + j] * x_fft_buf[0][pos + j];
-		G[1][xPos + j] = mu[xPos + j] * x_fft_buf[1][pos + j];
+#ifdef KALMAN_ADAPTION  
+		float re = h_fft_buf[0][Pos + j];
+		float im = h_fft_buf[1][Pos + j];
+		H2[Pos + j] = re * re + im * im;
+		//P[Pos + j] = 2;
+		Pe[Pos + j] = (0.5*P[Pos + j] * X2[j] + E2[j] /num_partitions);
+		mu[Pos + j] = P[Pos + j] / (Pe[Pos + j] + 0.0000001f);
+		//if ((6 < i) && (i < 10) && (32 < j) && (j < 44))
+		{
+			/*printf("%d,%d\n", i, j);
+			printf("re:%f\n", re);
+			printf("X2:%f\n", X2[j]);
+			printf("E2:%f\n", E2[j]);
+			printf("H2:%f\n", H2[Pos + j]);
+			printf("Pprev:%f\n", P[Pos + j]);
+			printf("Pe:%f\n", Pe[Pos + j]);
+			printf("mu:%f\n", mu[Pos + j]);*/
+		}
 
-		fft[2 * j] = MulRe(G[0][xPos + j], -G[1][xPos + j],
+		P[Pos + j] = A * A * (1 - 0.5*mu[Pos + j] * X2[j])*P[Pos + j] + (1 - A * A)*H2[Pos + j];
+
+		
+		//printf("P:%f\n\n", P[Pos + j]);
+		//Compute G 
+		G[0][Pos + j] = mu[Pos + j] * x_fft_buf[0][xPos + j];
+		G[1][Pos + j] = mu[Pos + j] * x_fft_buf[1][xPos + j];
+
+		fft[2 * j] = MulRe(G[0][Pos + j], -G[1][Pos + j],
 			e_fft[0][j], e_fft[1][j]);
-		fft[2 * j + 1] = MulIm(G[0][xPos + j], -G[1][xPos + j],
+		fft[2 * j + 1] = MulIm(G[0][Pos + j], -G[1][Pos + j],
 			e_fft[0][j], e_fft[1][j]);
 #else
       
@@ -431,7 +451,7 @@ static void FilterAdaptation(
     }
 #ifdef KALMAN_ADAPTION
 	fft[1] =
-		MulRe(G[0][xPos + PART_LEN], -G[1][xPos + PART_LEN],
+		MulRe(G[0][Pos + PART_LEN], -G[1][Pos + PART_LEN],
 			e_fft[0][PART_LEN], e_fft[1][PART_LEN]);
 #else
     fft[1] =
@@ -440,25 +460,42 @@ static void FilterAdaptation(
 #endif
 
     ooura_fft.InverseFft(fft);
+
     memset(fft + PART_LEN, 0, sizeof(float) * PART_LEN);
 
     // fft scaling
-    {
-      float scale = 2.0f / PART_LEN2;
-      for (j = 0; j < PART_LEN; j++) {
-        fft[j] *= scale;
-      }
-    }
+	float scale = 2.0f / PART_LEN2;
+	for (j = 0; j < PART_LEN; j++) {
+		fft[j] *= scale;
+	}
     ooura_fft.Fft(fft);
 
-    h_fft_buf[0][pos] += fft[0];
-    h_fft_buf[0][pos + PART_LEN] += fft[1];
+    h_fft_buf[0][Pos] += fft[0];
+    h_fft_buf[0][Pos + PART_LEN] += fft[1];
 
     for (j = 1; j < PART_LEN; j++) {
-      h_fft_buf[0][pos + j] += fft[2 * j];
-      h_fft_buf[1][pos + j] += fft[2 * j + 1];
+      h_fft_buf[0][Pos + j] += fft[2 * j];
+      h_fft_buf[1][Pos + j] += fft[2 * j + 1];
     }
+	
   }
+  //debug
+  //Pos = (num_partitions-1) * PART_LEN1;
+ // Pos = 0;
+ // float h_fft_buf_debug[2][PART_LEN1];
+ // h_fft_buf_debug[0][0] = h_fft_buf[0][Pos];
+ // h_fft_buf_debug[0][PART_LEN] = h_fft_buf[0][Pos + PART_LEN];
+ // for (j = 1; j < PART_LEN; j++) {
+	//  h_fft_buf_debug[0][j] = h_fft_buf[0][Pos + j];
+	//  h_fft_buf_debug[1][j] = h_fft_buf[1][Pos + j];
+	//  /*h_fft_buf_debug[0][j] = 0;
+	//  h_fft_buf_debug[1][j] = 0;*/
+ // }
+ // ScaledInverseFft(ooura_fft,h_fft_buf_debug, coefs_extended, 3.0f, 0);
+ // printf("Coefs:\n");
+ // for (j = 0; j < PART_LEN2; j++)
+	//printf("%f \n", coefs_extended[j]);
+ // printf("\n");
 }
 
 static void Overdrive(float overdrive_scaling,
@@ -1112,7 +1149,7 @@ static void EchoSubtraction(const OouraFft& ooura_fft,
   // Scale error signal inversely with far power.
   //WebRtcAec_ScaleErrorSignal(filter_step_size, error_threshold, x_pow, e_fft);
   WebRtcAec_FilterAdaptation(ooura_fft, num_partitions, *x_fft_buf_block_pos,
-                             x_fft_buf, e_fft, h_fft_buf, x_pow);
+                             x_fft_buf, e_fft, h_fft_buf);
   memcpy(echo_subtractor_output, e, sizeof(float) * PART_LEN);
 }
 
@@ -1309,7 +1346,7 @@ static void EchoSuppression(const OouraFft& ooura_fft,
 
   aec->data_dumper->DumpRaw("aec_nlp_gain", PART_LEN1, hNl);
 
-  WebRtcAec_Suppress(hNl, efw);
+ // WebRtcAec_Suppress(hNl, efw); //debug here
 
   // Add comfort noise.
   ComfortNoise(aec->num_bands > 1, &aec->seed, efw, comfortNoiseHband,
@@ -1767,7 +1804,7 @@ int WebRtcAec_InitAec(AecCore* aec, int sampFreq) {
     aec->coherence_state.sx[i] = 1;
   }
 
-  memset(aec->hNs, 0, sizeof(aec->hNs));
+  //memset(aec->hNs, 0, sizeof(aec->hNs));
   memset(aec->outBuf, 0, sizeof(float) * PART_LEN);
 
   aec->hNlFbMin = 1;
@@ -1792,8 +1829,8 @@ int WebRtcAec_InitAec(AecCore* aec, int sampFreq) {
   InitMetrics(aec);
   //kalman
 #ifdef KALMAN_ADAPTION
-  for (i = 0; i < kExtendedNumPartitions; ++i)
-	  P[i] = 1.0f;//³õÊ¼»¯Îó²î¾ØÕó
+  for (i = 0; i < kExtendedNumPartitions*PART_LEN1; ++i)
+	  P[i] = 10000;//³õÊ¼»¯Îó²î¾ØÕó
 #endif
   return 0;
 }

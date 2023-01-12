@@ -34,19 +34,6 @@ __inline static float MulIm(float aRe, float aIm, float bRe, float bIm) {
   return aRe * bIm + aIm * bRe;
 }
 
-/******************************************************************************************
-*********************** Parameters for Kalman adaption **************************************
-******************************************************************************************/
-//float X2[PART_LEN1] = {0};
-//float E2[PART_LEN1] = {0};
-//float H2[kExtendedNumPartitions*PART_LEN1] = { 0 };
-//float Pe[kExtendedNumPartitions*PART_LEN1] = { 0 };
-//float mu[kExtendedNumPartitions*PART_LEN1] = { 0 };
-//float P[kExtendedNumPartitions*PART_LEN1] = { 0 };
-//float G[2][kExtendedNumPartitions * PART_LEN1] = {0};
-//float A = 0.95;
-
-
 static void FilterFarSSE2(int num_partitions,
                           int x_fft_buf_block_pos,
                           float x_fft_buf[2]
@@ -159,7 +146,7 @@ static void FilterAdaptationSSE2(
     int x_fft_buf_block_pos,
     float x_fft_buf[2][kExtendedNumPartitions * PART_LEN1],
     float e_fft[2][PART_LEN1],
-    float h_fft_buf[2][kExtendedNumPartitions * PART_LEN1], float xPow[PART_LEN1]) {
+    float h_fft_buf[2][kExtendedNumPartitions * PART_LEN1]) {
   float fft[PART_LEN2];
   int i, j;
 
