@@ -76,7 +76,7 @@ float Pe[kExtendedNumPartitions*PART_LEN1] = { 0 };
 float mu[kExtendedNumPartitions*PART_LEN1] = { 0 };
 float P[kExtendedNumPartitions*PART_LEN1];
 float G[2][kExtendedNumPartitions * PART_LEN1] = { 0 };
-float A = 0.995;
+float A = 0.95;
 #endif
 
 // Buffer size (samples)
@@ -1831,7 +1831,7 @@ int WebRtcAec_InitAec(AecCore* aec, int sampFreq) {
   //kalman
 #ifdef KALMAN_ADAPTION
   for (i = 0; i < kExtendedNumPartitions*PART_LEN1; ++i)
-	  P[i] = 10000;//³õÊ¼»¯Îó²î¾ØÕó
+	  P[i] = 100;//³õÊ¼»¯Îó²î¾ØÕó
 #endif
   return 0;
 }
