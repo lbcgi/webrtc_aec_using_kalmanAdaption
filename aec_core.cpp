@@ -62,6 +62,7 @@ void MaybeLogDelayAdjustment(int moved_ms, DelaySource source) {
   }
 }
 }  // namespace
+//#define D_PRINT_FIR_COEFS
 #define KALMAN_ADAPTION
 /******************************************************************************************
 *********************** Parameters for Kalman adaption **************************************
@@ -479,23 +480,23 @@ static void FilterAdaptation(
     }
 	
   }
-  //debug
-  //Pos = (num_partitions-1) * PART_LEN1;
- // Pos = 0;
- // float h_fft_buf_debug[2][PART_LEN1];
- // h_fft_buf_debug[0][0] = h_fft_buf[0][Pos];
- // h_fft_buf_debug[0][PART_LEN] = h_fft_buf[0][Pos + PART_LEN];
- // for (j = 1; j < PART_LEN; j++) {
-	//  h_fft_buf_debug[0][j] = h_fft_buf[0][Pos + j];
-	//  h_fft_buf_debug[1][j] = h_fft_buf[1][Pos + j];
-	//  /*h_fft_buf_debug[0][j] = 0;
-	//  h_fft_buf_debug[1][j] = 0;*/
- // }
- // ScaledInverseFft(ooura_fft,h_fft_buf_debug, coefs_extended, 3.0f, 0);
- // printf("Coefs:\n");
- // for (j = 0; j < PART_LEN2; j++)
-	//printf("%f \n", coefs_extended[j]);
- // printf("\n");
+#ifdef D_PRINT_FIR_COEFS
+  Pos = 0;
+  float h_fft_buf_debug[2][PART_LEN1];
+  h_fft_buf_debug[0][0] = h_fft_buf[0][Pos];
+  h_fft_buf_debug[0][PART_LEN] = h_fft_buf[0][Pos + PART_LEN];
+  for (j = 1; j < PART_LEN; j++) {
+	  h_fft_buf_debug[0][j] = h_fft_buf[0][Pos + j];
+	  h_fft_buf_debug[1][j] = h_fft_buf[1][Pos + j];
+	  /*h_fft_buf_debug[0][j] = 0;
+	  h_fft_buf_debug[1][j] = 0;*/
+  }
+  ScaledInverseFft(ooura_fft,h_fft_buf_debug, coefs_extended, 3.0f, 0);
+  printf("Coefs:\n");
+  for (j = 0; j < PART_LEN2; j++)
+	printf("%f \n", coefs_extended[j]);
+  printf("\n");
+#endif
 }
 
 static void Overdrive(float overdrive_scaling,
