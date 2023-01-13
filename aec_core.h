@@ -65,8 +65,8 @@ typedef struct Stats {
 
 // Number of partitions for the extended filter mode. The first one is an enum
 // to be used in array declarations, as it represents the maximum filter length.
-enum { kExtendedNumPartitions = 32 };
-static const int kNormalNumPartitions = 12;
+enum { kExtendedNumPartitions = 32 }; //32
+static const int kNormalNumPartitions = 12;//12
 
 // Delay estimator constants, used for logging and delay compensation if
 // if reported delays are disabled.
@@ -170,7 +170,7 @@ struct AecCore {
   // Farend windowed fft buffer.
   complex_t xfwBuf[kExtendedNumPartitions * PART_LEN1];
 
-  float hNs[PART_LEN1];
+ // float hNs[PART_LEN1];
   float hNlFbMin, hNlFbLocalMin;
   float hNlXdAvgMin;
   int hNlNewMin, hNlMinCtr;
@@ -329,6 +329,12 @@ int WebRtcAec_system_delay(AecCore* self);
 // improperly, there can be a performance regression.  So it should be used with
 // care.
 void WebRtcAec_SetSystemDelay(AecCore* self, int delay);
+
+static void ScaledInverseFft(const OouraFft& ooura_fft,
+	float freq_data[2][PART_LEN1],
+	float time_data[PART_LEN2],
+	float scale,
+	int conjugate);
 
 }  // namespace webrtc
 
