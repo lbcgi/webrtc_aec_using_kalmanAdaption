@@ -76,7 +76,7 @@ float Pe[kExtendedNumPartitions*PART_LEN1] = { 0 };
 float mu[kExtendedNumPartitions*PART_LEN1] = { 0 };
 float P[kExtendedNumPartitions*PART_LEN1];
 float G[2][kExtendedNumPartitions * PART_LEN1] = { 0 };
-float A = 0.95;
+float A = 0.999;
 #endif
 
 // Buffer size (samples)
@@ -101,6 +101,22 @@ static const int freqAvgIc = PART_LEN / 2;
 // Matlab code to produce table:
 // win = sqrt(hanning(63)); win = [0 ; win(1:32)];
 // fprintf(1, '\t%.14f, %.14f, %.14f,\n', win);
+
+ALIGN16_BEG const float ALIGN16_END WebRtcAec_Hanning[64] = {
+	   0.        , 0.00248461, 0.00991376, 0.0222136 , 0.03926189,
+	   0.06088921, 0.08688061, 0.11697778, 0.15088159, 0.1882551 ,
+	   0.22872687, 0.27189467, 0.31732949, 0.36457977, 0.41317591,
+	   0.46263495, 0.51246535, 0.56217185, 0.61126047, 0.65924333,
+	   0.70564355, 0.75      , 0.79187184, 0.83084292, 0.86652594,
+	   0.89856625, 0.92664544, 0.95048443, 0.96984631, 0.98453864,
+	   0.99441541, 0.99937846, 0.99937846, 0.99441541, 0.98453864,
+	   0.96984631, 0.95048443, 0.92664544, 0.89856625, 0.86652594,
+	   0.83084292, 0.79187184, 0.75      , 0.70564355, 0.65924333,
+	   0.61126047, 0.56217185, 0.51246535, 0.46263495, 0.41317591,
+	   0.36457977, 0.31732949, 0.27189467, 0.22872687, 0.1882551 ,
+	   0.15088159, 0.11697778, 0.08688061, 0.06088921, 0.03926189,
+	   0.0222136 , 0.00991376, 0.00248461, 0. };
+
 ALIGN16_BEG const float ALIGN16_END WebRtcAec_sqrtHanning[65] = {
     0.00000000000000f, 0.02454122852291f, 0.04906767432742f, 0.07356456359967f,
     0.09801714032956f, 0.12241067519922f, 0.14673047445536f, 0.17096188876030f,
@@ -367,13 +383,14 @@ static void FilterAdaptation(
   int Pos;
 
   float fft[PART_LEN2];
+#ifdef D_PRINT_FIR_COEFS
   float coefs_extended[PART_LEN2];
-
+#endif
 
   /*Preparations before compute mu & G*/
 #ifdef KALMAN_ADAPTION
 	memset(X2, 0, sizeof(X2));
-	for (j = 0; j < PART_LEN; j++) {
+	for (j = 0; j < PART_LEN1; j++) {
 		//Compute X2 Enegy
 		for (i = 0; i < num_partitions; i++) {
 			int xPos = (i + x_fft_buf_block_pos) * (PART_LEN1);
@@ -382,16 +399,16 @@ static void FilterAdaptation(
 				xPos -= num_partitions * PART_LEN1;
 			}
 			//Load x_fft_buf
-			float re = x_fft_buf[0][xPos + j];
-			float im = x_fft_buf[1][xPos + j];
-			X2[j] += (re * re + im * im)*num_partitions;
+			double re = x_fft_buf[0][xPos + j];
+			double im = x_fft_buf[1][xPos + j];
+			X2[j] += re * re + im * im;
 			//printf("Pe:%f\n", Pe[xPos + 33]);
 
 		}
 		////Compute E2 Enegy
 		float re = e_fft[0][j];
 		float im = e_fft[1][j];
-		E2[j] = 0.99*E2[j] + 0.01*(re * re + im * im);
+		E2[j] = 0.9*E2[j] + 0.1*(re * re + im * im);
 
 
 	}
@@ -416,9 +433,9 @@ static void FilterAdaptation(
 		H2[Pos + j] = re * re + im * im;
 		//P[Pos + j] = 2;
 		Pe[Pos + j] = (0.5*P[Pos + j] * X2[j] + E2[j] /num_partitions);
-		mu[Pos + j] = P[Pos + j] / (Pe[Pos + j] + 0.0000001f);
+		mu[Pos + j] = P[Pos + j] / (Pe[Pos + j] + 0.00000000000001f);
 		//if ((6 < i) && (i < 10) && (32 < j) && (j < 44))
-		{
+		//{
 			/*printf("%d,%d\n", i, j);
 			printf("re:%f\n", re);
 			printf("X2:%f\n", X2[j]);
@@ -427,7 +444,7 @@ static void FilterAdaptation(
 			printf("Pprev:%f\n", P[Pos + j]);
 			printf("Pe:%f\n", Pe[Pos + j]);
 			printf("mu:%f\n", mu[Pos + j]);*/
-		}
+		//}
 
 		P[Pos + j] = A * A * (1 - 0.5*mu[Pos + j] * X2[j])*P[Pos + j] + (1 - A * A)*H2[Pos + j];
 
@@ -1134,12 +1151,13 @@ static void EchoSubtraction(const OouraFft& ooura_fft,
                       h_fft_buf, s_fft);
 
   // Compute the time-domain echo estimate s.
-  ScaledInverseFft(ooura_fft, s_fft, s_extended, 2.0f, 0);
+  ScaledInverseFft(ooura_fft, s_fft, s_extended, 2.0f, 0);// 2.0f
   s = &s_extended[PART_LEN];
 
   // Compute the time-domain echo prediction error.
   for (i = 0; i < PART_LEN; ++i) {
     e[i] = y[i] - s[i];
+	e[i] *= WebRtcAec_Hanning[i];
   }
 
   // Compute the frequency domain echo prediction error.
@@ -1151,6 +1169,9 @@ static void EchoSubtraction(const OouraFft& ooura_fft,
   //WebRtcAec_ScaleErrorSignal(filter_step_size, error_threshold, x_pow, e_fft);
   WebRtcAec_FilterAdaptation(ooura_fft, num_partitions, *x_fft_buf_block_pos,
                              x_fft_buf, e_fft, h_fft_buf);
+  /*for (i = 0; i < PART_LEN; ++i) {
+	  e[i] *= 32767;
+  }*/
   memcpy(echo_subtractor_output, e, sizeof(float) * PART_LEN);
 }
 
@@ -1360,7 +1381,6 @@ static void EchoSuppression(const OouraFft& ooura_fft,
   for (i = 0; i < PART_LEN; i++) {
     output[0][i] = (fft[i] * WebRtcAec_sqrtHanning[i] +
                     aec->outBuf[i] * WebRtcAec_sqrtHanning[PART_LEN - i]);
-
     // Saturate output to keep it in the allowed range.
     output[0][i] = WEBRTC_SPL_SAT(WEBRTC_SPL_WORD16_MAX, output[0][i],
                                   WEBRTC_SPL_WORD16_MIN);
@@ -1392,6 +1412,7 @@ static void EchoSuppression(const OouraFft& ooura_fft,
     // Saturate output to keep it in the allowed range.
     for (j = 1; j < aec->num_bands; ++j) {
       for (i = 0; i < PART_LEN; i++) {
+		
         output[j][i] = WEBRTC_SPL_SAT(WEBRTC_SPL_WORD16_MAX, output[j][i],
                                       WEBRTC_SPL_WORD16_MIN);
       }
