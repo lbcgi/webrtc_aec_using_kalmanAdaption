@@ -63,7 +63,7 @@ void MaybeLogDelayAdjustment(int moved_ms, DelaySource source) {
 }
 }  // namespace
 //#define D_PRINT_FIR_COEFS
-#define KALMAN_ADAPTION
+//#define KALMAN_ADAPTION
 /******************************************************************************************
 *********************** Parameters for Kalman adaption **************************************
 ******************************************************************************************/
@@ -1152,7 +1152,7 @@ static void EchoSubtraction(const OouraFft& ooura_fft,
                       h_fft_buf, s_fft);
 
   // Compute the time-domain echo estimate s.
-  ScaledInverseFft(ooura_fft, s_fft, s_extended, .5f, 0);// 2.0f
+  ScaledInverseFft(ooura_fft, s_fft, s_extended, 2.0f, 0);// 2.0f
   s = &s_extended[PART_LEN];
 
   // Compute the time-domain echo prediction error.
@@ -1165,9 +1165,11 @@ static void EchoSubtraction(const OouraFft& ooura_fft,
   memset(e_extended, 0, sizeof(float) * PART_LEN);
   memcpy(e_extended + PART_LEN, e_win, sizeof(float) * PART_LEN);
   Fft(ooura_fft, e_extended, e_fft);
-
+#ifndef KALMAN_ADAPTION
   // Scale error signal inversely with far power.
-  //WebRtcAec_ScaleErrorSignal(filter_step_size, error_threshold, x_pow, e_fft);
+  WebRtcAec_ScaleErrorSignal(filter_step_size, error_threshold, x_pow, e_fft);
+#endif
+
   WebRtcAec_FilterAdaptation(ooura_fft, num_partitions, *x_fft_buf_block_pos,
                              x_fft_buf, e_fft, h_fft_buf);
   /*for (i = 0; i < PART_LEN; ++i) {
@@ -1369,7 +1371,7 @@ static void EchoSuppression(const OouraFft& ooura_fft,
 
   aec->data_dumper->DumpRaw("aec_nlp_gain", PART_LEN1, hNl);
 
- // WebRtcAec_Suppress(hNl, efw); //debug here
+  WebRtcAec_Suppress(hNl, efw); //debug here
 
   // Add comfort noise.
   ComfortNoise(aec->num_bands > 1, &aec->seed, efw, comfortNoiseHband,
@@ -1853,7 +1855,7 @@ int WebRtcAec_InitAec(AecCore* aec, int sampFreq) {
   //kalman
 #ifdef KALMAN_ADAPTION
   for (i = 0; i < kExtendedNumPartitions*PART_LEN1; ++i)
-	  P[i] = 100;//³õÊ¼»¯Îó²î¾ØÕó
+	  P[i] = 10;//³õÊ¼»¯Îó²î¾ØÕó
 #endif
   return 0;
 }
