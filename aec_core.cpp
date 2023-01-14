@@ -408,7 +408,7 @@ static void FilterAdaptation(
 		////Compute E2 Enegy
 		float re = e_fft[0][j];
 		float im = e_fft[1][j];
-		E2[j] = 0.9*E2[j] + 0.1*(re * re + im * im);
+		E2[j] = 0.0*E2[j] + 1*(re * re + im * im);// 0.9|with 0.1
 
 
 	}
@@ -1121,6 +1121,7 @@ static void EchoSubtraction(const OouraFft& ooura_fft,
   float s_extended[PART_LEN2];
   float* s;
   float e[PART_LEN];
+  float e_win[PART_LEN];
   float e_fft[2][PART_LEN1];
   int i;
 
@@ -1151,18 +1152,18 @@ static void EchoSubtraction(const OouraFft& ooura_fft,
                       h_fft_buf, s_fft);
 
   // Compute the time-domain echo estimate s.
-  ScaledInverseFft(ooura_fft, s_fft, s_extended, 2.0f, 0);// 2.0f
+  ScaledInverseFft(ooura_fft, s_fft, s_extended, .5f, 0);// 2.0f
   s = &s_extended[PART_LEN];
 
   // Compute the time-domain echo prediction error.
   for (i = 0; i < PART_LEN; ++i) {
     e[i] = y[i] - s[i];
-	e[i] *= WebRtcAec_Hanning[i];
+	e_win[i] = e[i]*WebRtcAec_Hanning[i];
   }
 
   // Compute the frequency domain echo prediction error.
   memset(e_extended, 0, sizeof(float) * PART_LEN);
-  memcpy(e_extended + PART_LEN, e, sizeof(float) * PART_LEN);
+  memcpy(e_extended + PART_LEN, e_win, sizeof(float) * PART_LEN);
   Fft(ooura_fft, e_extended, e_fft);
 
   // Scale error signal inversely with far power.
